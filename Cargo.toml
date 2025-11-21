@@ -1,0 +1,19 @@
+[package]
+name = "wfc"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = "0.33.2"
+egui = "0.33.2"
+image = "0.25"
+rand = "0.9"
+rfd = "0.15"
+
+[[bin]]
+name = "wfc-egui"
+path = "src/bin/egui.rs"
+
+[[bin]]
+name = "generate-samples"
+path = "src/bin/generate_samples.rs"
