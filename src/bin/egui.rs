@@ -92,6 +92,22 @@ impl App {
             self.load_sample(path);
         }
     }
+
+    fn save_output(&mut self) {
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter("PNG", &["png"])
+            .set_file_name("output.png")
+            .save_file()
+        {
+            let colors = self.wfc.render();
+            let w = self.config.output_width;
+            let h = self.config.output_height;
+            let sample = Sample::new(w, h, colors);
+            if let Err(e) = sample.save(&path) {
+                self.error_msg = Some(format!("Failed to save: {}", e));
+            }
+        }
+    }
 }
 
 impl eframe::App for App {
@@ -183,7 +199,7 @@ impl eframe::App for App {
             ui.horizontal(|ui| {
                 ui.label("Width:");
                 if ui
-                    .add(egui::Slider::new(&mut self.config.output_width, 8..=64))
+                    .add(egui::Slider::new(&mut self.config.output_width, 8..=128))
                     .changed()
                 {
                     changed = true;
@@ -193,7 +209,7 @@ impl eframe::App for App {
             ui.horizontal(|ui| {
                 ui.label("Height:");
                 if ui
-                    .add(egui::Slider::new(&mut self.config.output_height, 8..=64))
+                    .add(egui::Slider::new(&mut self.config.output_height, 8..=128))
                     .changed()
                 {
                     changed = true;
@@ -224,11 +240,21 @@ impl eframe::App for App {
             });
 
             ui.horizontal(|ui| {
-                if ui
-                    .button(if self.running { "⏸ Pause" } else { "▶ Run" })
-                    .clicked()
-                {
-                    self.running = !self.running;
+                let is_finished = self.wfc.done || self.wfc.contradiction;
+                let button_label = if is_finished {
+                    "🔄 Rerun"
+                } else if self.running {
+                    "⏸ Pause"
+                } else {
+                    "▶ Run"
+                };
+                if ui.button(button_label).clicked() {
+                    if is_finished {
+                        self.reset();
+                        self.running = true;
+                    } else {
+                        self.running = !self.running;
+                    }
                 }
                 if ui.button("⏭ Step").clicked() {
                     self.wfc.step();
@@ -236,11 +262,11 @@ impl eframe::App for App {
             });
 
             ui.horizontal(|ui| {
-                if ui.button("🔄 Reset").clicked() {
-                    self.reset();
-                }
                 if ui.button("🎲 New").clicked() {
                     self.rebuild();
+                }
+                if ui.button("💾 Save").clicked() {
+                    self.save_output();
                 }
             });
 
