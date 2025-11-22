@@ -9,6 +9,7 @@ egui = "0.33.2"
 image = "0.25"
 rand = "0.9"
 rfd = "0.15"
+gif = "0.14"
 
 [[bin]]
 name = "wfc-egui"
