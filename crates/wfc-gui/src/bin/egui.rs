@@ -1,4 +1,4 @@
-use wfc::app::App;
+use wfc_gui::app::App;
 
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
