@@ -1,0 +1,16 @@
+[package]
+name = "wfc-gui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wfc-core = { path = "../wfc-core", features = ["image-io"] }
+eframe = "0.33.2"
+egui = "0.33.2"
+image = "0.25"
+rfd = "0.15"
+gif = "0.14"
+
+[[bin]]
+name = "wfc-egui"
+path = "src/bin/egui.rs"
