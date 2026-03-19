@@ -1,0 +1,24 @@
+[package]
+name = "wfc-core"
+version = "0.1.0"
+edition = "2024"
+description = "Fast Wave Function Collapse implementation for procedural image generation"
+license = "MIT"
+repository = "https://github.com/Elwqnn/wfc"
+keywords = ["wfc", "wave-function-collapse", "procedural-generation", "tilemap"]
+categories = ["algorithms", "graphics", "game-development"]
+
+[features]
+default = ["image-io"]
+image-io = ["dep:image"]
+
+[dependencies]
+image = { version = "0.25", optional = true }
+rand = "0.9"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "wfc_bench"
+harness = false
