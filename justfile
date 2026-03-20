@@ -44,6 +44,22 @@ cli *ARGS:
 core-minimal:
     cargo build -p wfc-core --no-default-features
 
+# Run benchmarks (HTML report in target/criterion/report/)
+bench:
+    cargo bench -p wfc-core
+
+# Run benchmarks and open HTML report
+bench-report: bench
+    xdg-open target/criterion/report/index.html
+
+# Save benchmark baseline (e.g. `just bench-save main`)
+bench-save NAME:
+    cargo bench -p wfc-core -- --save-baseline {{NAME}}
+
+# Compare benchmarks against a saved baseline (e.g. `just bench-compare main`)
+bench-compare NAME:
+    cargo bench -p wfc-core -- --baseline {{NAME}}
+
 # Clean build artifacts
 clean:
     cargo clean
