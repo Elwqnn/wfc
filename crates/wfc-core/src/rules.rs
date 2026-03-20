@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::grid::{Direction, Grid};
 use crate::{Color, Pattern, Sample};
 
-/// Cache-friendly flat propagator storing compatible pattern indices contiguously.
+/// Contiguous storage of compatible pattern indices per (pattern, direction).
 pub(crate) struct FlatPropagator {
     data: Vec<u16>,
     /// `offsets[pattern * 4 + dir]` = (start, end) into data
@@ -20,38 +20,33 @@ impl FlatPropagator {
     }
 }
 
-/// Per-pattern edge position flags.
 pub(crate) const TOP: usize = 0;
 pub(crate) const BOTTOM: usize = 1;
 pub(crate) const LEFT: usize = 2;
 pub(crate) const RIGHT: usize = 3;
 
-/// Immutable rules derived from the sample image.
+/// Immutable rules derived from the sample.
 pub struct Rules {
     pub(crate) config: Config,
     pub(crate) grid: Grid,
     pub(crate) patterns: Vec<Pattern>,
-    /// Interleaved `(weight, log_weight)` per pattern — co-located for cache locality.
+    /// `(weight, log_weight)` per pattern.
     pub(crate) weight_table: Vec<(f64, f64)>,
     pub(crate) propagator: FlatPropagator,
     pub(crate) starting_entropy: f64,
-    /// Initial compatibility count per (pattern, direction) when all viable patterns possible.
+    /// Base compatibility counts per (pattern, direction).
     pub(crate) base_compat: Vec<u16>,
-    /// `edge_mask[pattern]` — which edges this pattern appeared at in the sample.
+    /// `edge_mask[pattern]`: sample edges where this pattern appeared.
     pub(crate) edge_mask: Vec<[bool; 4]>,
-    /// Patterns that have at least one viable neighbor in every direction.
+    /// Patterns with at least one neighbor in every direction.
     pub(crate) viable: Vec<bool>,
-    /// Top-left color of each pattern (avoids Pattern stride during render).
+    /// Top-left color per pattern (render cache).
     pub(crate) colors: Vec<Color>,
 }
 
 impl Rules {
     pub fn from_sample(sample: &Sample, config: Config) -> Self {
-        let grid = Grid::new(
-            config.output_width,
-            config.output_height,
-            config.periodic_output,
-        );
+        let grid = Grid::new(config.output_width, config.output_height, config.boundary);
         let extracted = Self::extract_patterns(sample, &config);
         let propagator = Self::build_propagator(&extracted.patterns, &config);
 
@@ -109,8 +104,7 @@ impl Rules {
         self.weight_table[p].0
     }
 
-    /// Iterate until fixpoint: any pattern with zero viable compatible neighbors
-    /// in any direction is marked non-viable.
+    /// Fixpoint: remove patterns with no viable neighbor in any direction.
     fn compute_viable(propagator: &FlatPropagator, num_patterns: usize) -> Vec<bool> {
         let mut viable = vec![true; num_patterns];
         loop {
@@ -141,7 +135,6 @@ impl Rules {
     fn extract_patterns(sample: &Sample, config: &Config) -> ExtractedPatterns {
         let n = config.pattern_size;
         let mut pattern_counts: HashMap<Pattern, usize> = HashMap::new();
-        // Track which edges each pattern appeared at (indexed after dedup)
         let mut pattern_edges: HashMap<Pattern, [bool; 4]> = HashMap::new();
 
         let x_max = if config.periodic_input {
@@ -220,19 +213,8 @@ impl Rules {
         let n = config.pattern_size;
         let num_patterns = patterns.len();
 
-        // Hash-based propagator: for each direction, hash the overlap strip
-        // of every pattern so compatible pairs can be found via hash lookup
-        // instead of O(P²) pairwise comparison.
-        //
-        // For direction Right: p1's columns [1..n] must match p2's columns [0..n-1]
-        // For direction Down:  p1's rows [1..n] must match p2's rows [0..n-1]
-        // etc.
-
-        // Build hash tables: strip_hash -> list of pattern indices
-        // "source" strip = the strip of p1 that must match, "target" strip = strip of p2
-        // For Right: p1 source = cols [1..n], p2 target = cols [0..n-1]
-        // We hash p2's target strips, then look up p1's source strips.
-
+        // Hash overlap strips to find compatible pairs in O(P) instead of O(P^2).
+        // Right: p1 cols [1..n] must match p2 cols [0..n-1], etc.
         let mut nested_vecs = vec![vec![Vec::<u16>::new(); 4]; num_patterns];
 
         // Right: p1 cols [1..n] == p2 cols [0..n-1]
@@ -287,12 +269,7 @@ impl Rules {
         FlatPropagator { data, offsets }
     }
 
-    /// Fill compatible list for one direction using hash-based matching.
-    ///
-    /// `source_hash(pattern, n)` returns the hash of p1's overlap strip.
-    /// `target_hash(pattern, n)` returns the hash of p2's overlap strip.
-    /// Two patterns are compatible iff source_hash(p1) == target_hash(p2)
-    /// AND the actual pixels match (hash collision check).
+    /// Hash-match one direction: candidates by hash, then verify pixels.
     fn fill_compatible_hashed(
         patterns: &[Pattern],
         n: usize,
@@ -301,7 +278,6 @@ impl Rules {
         source_hash: impl Fn(&Pattern, usize) -> u64,
         target_hash: impl Fn(&Pattern, usize) -> u64,
     ) {
-        // Build map from target hash → list of (pattern_index)
         let mut target_map: HashMap<u64, Vec<u16>> = HashMap::new();
         for (j, p2) in patterns.iter().enumerate() {
             target_map
@@ -310,7 +286,6 @@ impl Rules {
                 .push(j as u16);
         }
 
-        // For each p1, look up candidates by source hash, then verify
         for (i, p1) in patterns.iter().enumerate() {
             let h = source_hash(p1, n);
             if let Some(candidates) = target_map.get(&h) {
@@ -324,7 +299,7 @@ impl Rules {
         }
     }
 
-    /// Verify that the overlap strips of two patterns actually match for a direction.
+    /// Pixel-level overlap strip verification.
     fn strips_match(p1: &Pattern, p2: &Pattern, dir: usize, n: usize) -> bool {
         let (dx, dy): (i32, i32) = match dir {
             0 => (1, 0),  // Right

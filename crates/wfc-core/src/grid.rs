@@ -1,4 +1,5 @@
-/// Cardinal direction for adjacency.
+use crate::boundary::Boundary;
+
 #[derive(Clone, Copy, Debug)]
 pub enum Direction {
     Right = 0,
@@ -46,42 +47,47 @@ impl Direction {
 
 const NO_NEIGHBOR: u32 = u32::MAX;
 
-/// Precomputed neighbor lookup table for a grid.
-///
-/// Eliminates per-cell coordinate math and periodic/bounded branching
-/// from the propagation hot path.
+/// Precomputed neighbor lookup; avoids coordinate math on the propagation hot path.
 pub(crate) struct Grid {
     pub(crate) width: usize,
     pub(crate) height: usize,
-    /// `neighbors[cell * 4 + dir]` — neighbor cell index, or sentinel if out of bounds.
+    /// `neighbors[cell * 4 + dir]`: neighbor cell index, or sentinel if out of bounds.
     neighbors: Vec<u32>,
 }
 
 impl Grid {
-    pub(crate) fn new(width: usize, height: usize, periodic: bool) -> Self {
+    pub(crate) fn new(width: usize, height: usize, boundary: Boundary) -> Self {
         let size = width * height;
         let mut neighbors = vec![NO_NEIGHBOR; size * 4];
+        let wrap_x = boundary.wraps_x();
+        let wrap_y = boundary.wraps_y();
 
         for cell in 0..size {
             let x = cell % width;
             let y = cell / width;
 
             for dir in Direction::ALL {
-                let nx = x as i32 + dir.dx();
-                let ny = y as i32 + dir.dy();
+                let raw_x = x as i32 + dir.dx();
+                let raw_y = y as i32 + dir.dy();
 
-                let neighbor = if periodic {
-                    let nx = nx.rem_euclid(width as i32) as usize;
-                    let ny = ny.rem_euclid(height as i32) as usize;
-                    Some(ny * width + nx)
-                } else if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
-                    Some(ny as usize * width + nx as usize)
+                let resolved_x = if raw_x >= 0 && raw_x < width as i32 {
+                    Some(raw_x as usize)
+                } else if wrap_x {
+                    Some(raw_x.rem_euclid(width as i32) as usize)
                 } else {
                     None
                 };
 
-                if let Some(n) = neighbor {
-                    neighbors[cell * 4 + dir as usize] = n as u32;
+                let resolved_y = if raw_y >= 0 && raw_y < height as i32 {
+                    Some(raw_y as usize)
+                } else if wrap_y {
+                    Some(raw_y.rem_euclid(height as i32) as usize)
+                } else {
+                    None
+                };
+
+                if let (Some(nx), Some(ny)) = (resolved_x, resolved_y) {
+                    neighbors[cell * 4 + dir as usize] = (ny * width + nx) as u32;
                 }
             }
         }

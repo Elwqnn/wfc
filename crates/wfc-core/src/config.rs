@@ -1,31 +1,27 @@
-/// Configuration for WFC generation.
+use crate::boundary::Boundary;
+
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// Pattern size (N in NxN)
+    /// N in NxN pattern extraction.
     pub pattern_size: usize,
-    /// Output width in cells
     pub output_width: usize,
-    /// Output height in cells
     pub output_height: usize,
-    /// Whether to wrap input sampling around edges
+    /// Wrap sample scanning around edges.
     pub periodic_input: bool,
-    /// Whether to wrap output around edges
-    pub periodic_output: bool,
-    /// Whether to include rotations/reflections
+    pub boundary: Boundary,
+    /// Include rotation/reflection variants.
     pub symmetry: bool,
-    /// Constrain patterns at top/bottom edges based on sample position
+    /// Constrain top/bottom patterns to match sample edge positions.
     pub ground: bool,
-    /// Constrain patterns at left/right edges based on sample position
+    /// Constrain left/right patterns to match sample edge positions.
     pub sides: bool,
-    /// Optional seed for deterministic output
+    /// RNG seed for deterministic output.
     pub seed: Option<u64>,
-    /// Bias pattern selection toward more flexible choices
+    /// Bias collapse toward patterns with more viable neighbors.
     pub use_flexibility: bool,
-    /// Enable backtracking on contradiction
     pub backtracking: bool,
-    /// Maximum number of backtracks before giving up
     pub max_backtracks: usize,
-    /// Save a snapshot every N collapses for backtracking
+    /// Snapshot interval (in collapses) for backtracking.
     pub snapshot_interval: usize,
 }
 
@@ -36,7 +32,7 @@ impl Default for Config {
             output_width: 32,
             output_height: 32,
             periodic_input: true,
-            periodic_output: false,
+            boundary: Boundary::Fixed,
             symmetry: true,
             ground: false,
             sides: false,
