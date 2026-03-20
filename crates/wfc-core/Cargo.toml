@@ -11,10 +11,12 @@ categories = ["algorithms", "graphics", "game-development"]
 [features]
 default = ["image-io"]
 image-io = ["dep:image"]
+parallel = ["dep:rayon"]
 
 [dependencies]
 image = { version = "0.25", optional = true }
 rand = "0.9"
+rayon = { version = "1", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

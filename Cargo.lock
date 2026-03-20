@@ -4103,6 +4103,7 @@ dependencies = [
  "criterion",
  "image",
  "rand",
+ "rayon",
 ]
 
 [[package]]
