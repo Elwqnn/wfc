@@ -1,8 +1,31 @@
 use std::path::{Path, PathBuf};
 use std::process;
 
-use clap::{Args, Parser, Subcommand};
-use wfc_core::{Color, Config, Sample, Wfc, default_pipe_sample};
+use clap::{Args, Parser, Subcommand, ValueEnum};
+use wfc_core::{Boundary, Color, Config, RunOutcome, Sample, Wfc, default_pipe_sample};
+
+#[derive(Clone, ValueEnum)]
+enum BoundaryArg {
+    /// No wrapping — hard edges
+    Fixed,
+    /// Wrap horizontally (left/right connect)
+    PeriodicX,
+    /// Wrap vertically (top/bottom connect)
+    PeriodicY,
+    /// Wrap both axes (toroidal)
+    Periodic,
+}
+
+impl From<BoundaryArg> for Boundary {
+    fn from(b: BoundaryArg) -> Self {
+        match b {
+            BoundaryArg::Fixed => Boundary::Fixed,
+            BoundaryArg::PeriodicX => Boundary::PeriodicX,
+            BoundaryArg::PeriodicY => Boundary::PeriodicY,
+            BoundaryArg::Periodic => Boundary::Periodic,
+        }
+    }
+}
 
 /// Wave Function Collapse image generator
 #[derive(Parser)]
@@ -42,9 +65,9 @@ struct RunArgs {
     #[arg(long)]
     no_symmetry: bool,
 
-    /// Enable periodic (wrapping) output
-    #[arg(long)]
-    periodic: bool,
+    /// Output boundary mode
+    #[arg(long, value_enum, default_value_t = BoundaryArg::Fixed)]
+    boundary: BoundaryArg,
 
     /// Max retries on contradiction
     #[arg(short, long, default_value_t = 10)]
@@ -81,7 +104,7 @@ fn cmd_run(args: RunArgs) {
         pattern_size,
         seed,
         no_symmetry,
-        periodic,
+        boundary,
         retries,
     } = args;
     let sample = match &input {
@@ -97,7 +120,7 @@ fn cmd_run(args: RunArgs) {
         output_width: width,
         output_height: height,
         periodic_input: true,
-        periodic_output: periodic,
+        boundary: boundary.into(),
         symmetry: !no_symmetry,
         ground: false,
         sides: false,
@@ -107,9 +130,8 @@ fn cmd_run(args: RunArgs) {
 
     for attempt in 1..=retries {
         let mut wfc = Wfc::new(&sample, config.clone());
-        wfc.run();
 
-        if wfc.is_done() {
+        if wfc.run() == RunOutcome::Complete {
             let colors = wfc.render();
             let out_sample = Sample::new(width, height, colors);
             match out_sample.save(Path::new(&output)) {

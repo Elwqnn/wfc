@@ -1,5 +1,7 @@
 use eframe::egui::{self, Color32, Pos2, Rect, Stroke, Vec2};
 
+use wfc_core::{Boundary, StepOutcome};
+
 use super::App;
 
 fn config_slider(
@@ -103,9 +105,38 @@ impl eframe::App for App {
                 changed |= config_slider(ui, "Width:", &mut config.output_width, 8..=128);
                 changed |= config_slider(ui, "Height:", &mut config.output_height, 8..=128);
                 changed |= ui.checkbox(&mut config.symmetry, "Symmetry").changed();
-                changed |= ui
-                    .checkbox(&mut config.periodic_output, "Periodic output")
-                    .changed();
+
+                let boundary_label = match config.boundary {
+                    Boundary::Fixed => "Fixed",
+                    Boundary::PeriodicX => "Periodic X",
+                    Boundary::PeriodicY => "Periodic Y",
+                    Boundary::Periodic => "Periodic",
+                };
+                egui::ComboBox::from_label("Boundary")
+                    .selected_text(boundary_label)
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(&mut config.boundary, Boundary::Fixed, "Fixed")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut config.boundary,
+                                Boundary::PeriodicX,
+                                "Periodic X",
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut config.boundary,
+                                Boundary::PeriodicY,
+                                "Periodic Y",
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(&mut config.boundary, Boundary::Periodic, "Periodic")
+                            .changed();
+                    });
+
                 changed |= ui
                     .checkbox(&mut config.ground, "Ground (preserve verticality)")
                     .changed();
@@ -146,7 +177,7 @@ impl eframe::App for App {
                         }
                     }
                     if ui.button("⏭ Step").clicked() {
-                        self.wfc.step();
+                        let _ = self.wfc.step();
                         self.capture_frame();
                     }
                 });
@@ -226,7 +257,7 @@ impl eframe::App for App {
                     }
                 } else {
                     for _ in 0..self.playback.steps_per_frame {
-                        if !self.wfc.step() {
+                        if self.wfc.step() != StepOutcome::Progressed {
                             break;
                         }
                         self.capture_frame();
