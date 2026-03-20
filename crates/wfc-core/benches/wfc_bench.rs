@@ -1,7 +1,7 @@
 //! Benchmarks for wfc-core hot paths.
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use wfc_core::{Config, Sample, Wfc, default_pipe_sample};
+use wfc_core::{Config, Sample, StepOutcome, Wfc, default_pipe_sample};
 
 fn large_sample() -> Sample {
     // 16x16 sample with varied colors for a richer pattern set
@@ -100,7 +100,7 @@ fn bench_step(c: &mut Criterion) {
         b.iter(|| {
             let mut wfc = Wfc::new(&pipes, config.clone());
             for _ in 0..100 {
-                if !wfc.step() {
+                if wfc.step() != StepOutcome::Progressed {
                     break;
                 }
             }

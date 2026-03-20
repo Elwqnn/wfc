@@ -1,11 +1,8 @@
 use std::fmt;
 
-/// Errors that can occur during WFC operations.
 #[derive(Debug, Clone)]
 pub enum Error {
-    /// Failed to load an image file.
     ImageLoad(String),
-    /// Failed to save an image file.
     ImageSave(String),
 }
 
@@ -19,3 +16,17 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StepOutcome {
+    /// A cell was collapsed or a backtrack recovered.
+    Progressed,
+    Complete,
+    Contradiction,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunOutcome {
+    Complete,
+    Contradiction,
+}

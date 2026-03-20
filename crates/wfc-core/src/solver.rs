@@ -2,22 +2,21 @@ use rand::Rng;
 
 use crate::backtrack::BacktrackState;
 use crate::config::Config;
+use crate::constraint::{CellConstraint, ConstraintContext};
+use crate::error::{RunOutcome, StepOutcome};
 use crate::grid::Direction;
 use crate::rules::{self, Rules};
 use crate::state::State;
 use crate::{Color, Sample};
 
-/// WFC solver combining immutable rules with mutable state.
 pub struct Wfc {
     pub(crate) rules: Rules,
     pub(crate) state: State,
     backtrack: Option<BacktrackState>,
-    /// Reusable buffer for weighted pattern selection during collapse.
     candidates: Vec<(usize, f64)>,
 }
 
 impl Wfc {
-    /// Create a new WFC instance from a sample.
     #[must_use]
     pub fn new(sample: &Sample, config: Config) -> Self {
         let backtrack = if config.backtracking {
@@ -166,7 +165,6 @@ impl Wfc {
         min_cell
     }
 
-    /// Collapse a cell by choosing a pattern. Returns the chosen pattern index.
     fn collapse(&mut self, cell: usize) -> usize {
         let use_flex = self.rules.config.use_flexibility;
 
@@ -215,7 +213,6 @@ impl Wfc {
         Self::propagate_from(&mut self.state, &self.rules);
     }
 
-    /// Core propagation loop with explicit state/rules split.
     fn propagate_from(state: &mut State, rules: &Rules) {
         while let Some((cell, banned)) = state.stack.pop() {
             for dir in Direction::ALL {
@@ -240,28 +237,33 @@ impl Wfc {
         }
     }
 
-    pub fn step(&mut self) -> bool {
+    pub fn step(&mut self) -> StepOutcome {
         if self.state.done {
-            return false;
+            return StepOutcome::Complete;
         }
 
-        // Handle contradiction with backtracking
         if self.state.contradiction {
             if let Some(bt) = &mut self.backtrack
                 && bt.try_backtrack(&mut self.state, &self.rules)
             {
                 self.propagate();
-                return !self.state.contradiction;
+                return if self.state.contradiction {
+                    StepOutcome::Contradiction
+                } else {
+                    StepOutcome::Progressed
+                };
             }
-            return false;
+            return StepOutcome::Contradiction;
         }
 
         match self.observe() {
             None => {
-                if !self.state.contradiction {
+                if self.state.contradiction {
+                    StepOutcome::Contradiction
+                } else {
                     self.state.done = true;
+                    StepOutcome::Complete
                 }
-                false
             }
             Some(cell) => {
                 let (x, y) = self.rules.grid.coords(cell);
@@ -278,13 +280,26 @@ impl Wfc {
                 }
 
                 self.propagate();
-                true
+                StepOutcome::Progressed
             }
         }
     }
 
-    pub fn run(&mut self) {
-        while self.step() {}
+    pub fn run(&mut self) -> RunOutcome {
+        loop {
+            match self.step() {
+                StepOutcome::Progressed => continue,
+                StepOutcome::Complete => return RunOutcome::Complete,
+                StepOutcome::Contradiction => return RunOutcome::Contradiction,
+            }
+        }
+    }
+
+    /// Apply a constraint and propagate. Call before `run()`/`step()`.
+    pub fn constrain(&mut self, constraint: &dyn CellConstraint) {
+        let mut ctx = ConstraintContext::new(&mut self.state, &self.rules);
+        constraint.apply(&mut ctx);
+        Self::propagate_from(&mut self.state, &self.rules);
     }
 
     #[must_use]
@@ -335,7 +350,6 @@ impl Wfc {
     }
 }
 
-/// Count compatible patterns still possible at neighbors for a given pattern.
 fn pattern_flexibility(state: &State, rules: &Rules, cell: usize, pattern: usize) -> f64 {
     let mut flexibility: f64 = 0.0;
 
@@ -390,8 +404,11 @@ mod tests {
             ..Default::default()
         };
         let mut wfc = Wfc::new(&sample, config);
-        wfc.run();
-        assert!(wfc.is_done() || wfc.has_contradiction());
+        let outcome = wfc.run();
+        assert!(matches!(
+            outcome,
+            RunOutcome::Complete | RunOutcome::Contradiction
+        ));
     }
 
     #[test]
@@ -423,8 +440,7 @@ mod tests {
                 ..Default::default()
             };
             let mut wfc = Wfc::new(&sample, config);
-            wfc.run();
-            if wfc.has_contradiction() {
+            if wfc.run() == RunOutcome::Contradiction {
                 contradictions_without += 1;
             }
         }
@@ -439,8 +455,7 @@ mod tests {
                 ..Default::default()
             };
             let mut wfc = Wfc::new(&sample, config);
-            wfc.run();
-            if wfc.has_contradiction() {
+            if wfc.run() == RunOutcome::Contradiction {
                 contradictions_with += 1;
             }
         }
@@ -474,5 +489,65 @@ mod tests {
             render1, render2,
             "Same seed + backtracking must produce identical output"
         );
+    }
+
+    #[test]
+    fn step_outcome_lifecycle() {
+        let sample = default_pipe_sample();
+        let config = Config {
+            seed: Some(42),
+            output_width: 4,
+            output_height: 4,
+            ..Default::default()
+        };
+        let mut wfc = Wfc::new(&sample, config);
+
+        let first = wfc.step();
+        assert_eq!(first, StepOutcome::Progressed);
+
+        // Run to completion
+        loop {
+            match wfc.step() {
+                StepOutcome::Progressed => continue,
+                StepOutcome::Complete => break,
+                StepOutcome::Contradiction => break,
+            }
+        }
+
+        // After completion, step returns Complete
+        if wfc.is_done() {
+            assert_eq!(wfc.step(), StepOutcome::Complete);
+        }
+    }
+
+    #[test]
+    fn custom_constraint_bans_pattern() {
+        use crate::constraint::{CellConstraint, ConstraintContext};
+
+        struct BanFirstPattern;
+        impl CellConstraint for BanFirstPattern {
+            fn apply(&self, ctx: &mut ConstraintContext) {
+                let w = ctx.grid_width();
+                let h = ctx.grid_height();
+                for y in 0..h {
+                    for x in 0..w {
+                        ctx.ban(x, y, 0);
+                    }
+                }
+            }
+        }
+
+        let sample = default_pipe_sample();
+        let config = Config {
+            seed: Some(42),
+            output_width: 8,
+            output_height: 8,
+            ..Default::default()
+        };
+        let mut wfc = Wfc::new(&sample, config);
+        wfc.constrain(&BanFirstPattern);
+        wfc.run();
+        // Should complete (or contradict) without panic
+        assert!(wfc.is_done() || wfc.has_contradiction());
     }
 }
