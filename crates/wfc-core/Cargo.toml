@@ -5,7 +5,7 @@ edition = "2024"
 description = "Fast Wave Function Collapse implementation for procedural image generation"
 license = "MIT"
 repository = "https://github.com/Elwqnn/wfc"
-keywords = ["wfc", "wave-function-collapse", "procedural-generation", "tilemap"]
+keywords = ["wfc", "wave-function", "procedural-gen", "tilemap"]
 categories = ["algorithms", "graphics", "game-development"]
 
 [features]
