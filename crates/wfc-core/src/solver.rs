@@ -176,8 +176,7 @@ impl Wfc {
 
         for p in self.state.wave.iter_set(cell) {
             let w = if use_flex {
-                self.rules.weight(p)
-                    * pattern_flexibility(&self.state, &self.rules, cell, p).sqrt()
+                self.rules.weight(p) * pattern_flexibility(&self.state, &self.rules, cell, p).sqrt()
             } else {
                 self.rules.weight(p)
             };

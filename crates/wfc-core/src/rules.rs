@@ -58,11 +58,8 @@ impl Rules {
         let patterns = extracted.patterns;
         let edge_mask = extracted.edge_mask;
 
-        let weight_table: Vec<(f64, f64)> = extracted
-            .weights
-            .iter()
-            .map(|&w| (w, w.ln()))
-            .collect();
+        let weight_table: Vec<(f64, f64)> =
+            extracted.weights.iter().map(|&w| (w, w.ln())).collect();
         let total_weight: f64 = weight_table.iter().map(|(w, _)| w).sum();
         let sum_wlog: f64 = weight_table.iter().map(|(w, lw)| w * lw).sum();
         let starting_entropy = total_weight.ln() - sum_wlog / total_weight;
