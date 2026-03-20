@@ -1,9 +1,5 @@
-/// Compact bitset for tracking which patterns are possible per cell.
-///
-/// For <=64 patterns: 1 u64 word per cell.
-/// For >64 patterns: multiple u64 words per cell.
-/// Unused bits in the last word are always cleared, so iteration
-/// needs no bounds check against `num_patterns`.
+/// Per-cell pattern bitset. Unused bits in the last word are always
+/// cleared, so iteration needs no bounds check.
 #[derive(Clone)]
 pub(crate) struct Bitset {
     bits: Vec<u64>,
@@ -11,7 +7,6 @@ pub(crate) struct Bitset {
 }
 
 impl Bitset {
-    /// Create a new bitset with all `num_patterns` bits enabled for every cell.
     pub(crate) fn new(num_cells: usize, num_patterns: usize) -> Self {
         let words_per_cell = num_patterns.div_ceil(64);
         let total_words = num_cells * words_per_cell;
@@ -57,7 +52,7 @@ impl Bitset {
         count as usize
     }
 
-    /// Return the index of the first set bit for a cell (fast path for collapsed cells).
+    /// First set bit index (fast path for collapsed cells).
     #[inline(always)]
     pub(crate) fn first_set(&self, cell: usize) -> usize {
         let base = cell * self.words_per_cell;
@@ -70,7 +65,7 @@ impl Bitset {
         0 // unreachable if any bit is set
     }
 
-    /// Iterate over set bit indices for a cell in ascending order.
+    /// Set bit indices for a cell, ascending.
     #[inline]
     pub(crate) fn iter_set(&self, cell: usize) -> BitsetIter<'_> {
         let base = cell * self.words_per_cell;
@@ -160,7 +155,7 @@ mod tests {
 
     #[test]
     fn iter_does_not_yield_beyond_num_patterns() {
-        // 10 patterns → 1 word, bits 10..63 are cleared by new()
+        // 10 patterns -> 1 word, bits 10..63 are cleared by new()
         let bs = Bitset::new(1, 10);
         let set: Vec<usize> = bs.iter_set(0).collect();
         assert_eq!(set, (0..10).collect::<Vec<_>>());

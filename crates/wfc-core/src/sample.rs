@@ -2,7 +2,6 @@ use crate::Color;
 #[cfg(feature = "image-io")]
 use crate::Error;
 
-/// Sample image represented as a 2D grid of colors.
 #[derive(Clone, Debug)]
 pub struct Sample {
     pub width: usize,
@@ -25,7 +24,6 @@ impl Sample {
     }
 
     #[cfg(feature = "image-io")]
-    /// Load a sample from an image file.
     pub fn from_image(path: &std::path::Path) -> Result<Self, Error> {
         let img = image::open(path).map_err(|e| Error::ImageLoad(e.to_string()))?;
         let rgb = img.to_rgb8();
@@ -40,7 +38,6 @@ impl Sample {
     }
 
     #[cfg(feature = "image-io")]
-    /// Save sample to an image file.
     pub fn save(&self, path: &std::path::Path) -> Result<(), Error> {
         let mut img = image::RgbImage::new(self.width as u32, self.height as u32);
         for y in 0..self.height {
@@ -53,7 +50,6 @@ impl Sample {
     }
 }
 
-/// Default 8x8 pipe pattern sample.
 pub fn default_pipe_sample() -> Sample {
     let bg: Color = [32, 32, 48];
     let pipe: Color = [64, 128, 192];

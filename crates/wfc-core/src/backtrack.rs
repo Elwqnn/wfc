@@ -4,7 +4,6 @@ use crate::bitset::Bitset;
 use crate::rules::Rules;
 use crate::state::State;
 
-/// A snapshot of the solver state for backtracking.
 struct Snapshot {
     wave: Bitset,
     compat: Vec<u16>,
@@ -12,9 +11,9 @@ struct Snapshot {
     weight_sum: Vec<f64>,
     wlog_sum: Vec<f64>,
     rng: SmallRng,
-    /// The cell that was collapsed after this snapshot.
+    /// Cell collapsed after this snapshot was taken.
     cell: usize,
-    /// The pattern that was chosen (to ban on backtrack).
+    /// Pattern chosen (banned on backtrack).
     chosen: usize,
 }
 
@@ -46,7 +45,6 @@ impl Snapshot {
     }
 }
 
-/// Manages backtracking state.
 pub(crate) struct BacktrackState {
     snapshots: Vec<Snapshot>,
     pending_snapshot: Option<Snapshot>,
@@ -68,7 +66,7 @@ impl BacktrackState {
         }
     }
 
-    /// Called BEFORE collapse to capture pre-collapse state if needed.
+    /// Capture pre-collapse state if due for a snapshot.
     pub(crate) fn before_collapse(&mut self, state: &State) {
         self.collapse_count += 1;
         if self.collapse_count.is_multiple_of(self.snapshot_interval) {
@@ -78,7 +76,7 @@ impl BacktrackState {
         }
     }
 
-    /// Called AFTER collapse to record which cell/pattern was chosen.
+    /// Finalize pending snapshot with the collapse decision.
     pub(crate) fn after_collapse(&mut self, cell: usize, chosen: usize) {
         if let Some(mut snapshot) = self.pending_snapshot.take() {
             snapshot.cell = cell;
@@ -87,8 +85,7 @@ impl BacktrackState {
         }
     }
 
-    /// Attempt to backtrack on contradiction.
-    /// Returns true if backtrack succeeded, false if exhausted.
+    /// Restore to an earlier snapshot and ban the pattern that caused the contradiction.
     pub(crate) fn try_backtrack(&mut self, state: &mut State, rules: &Rules) -> bool {
         while let Some(snapshot) = self.snapshots.pop() {
             self.backtrack_count += 1;
@@ -100,10 +97,8 @@ impl BacktrackState {
             let banned_pattern = snapshot.chosen;
             snapshot.restore(state);
 
-            // Ban the pattern that led to contradiction
             state.ban(banned_cell, banned_pattern, rules);
 
-            // Check if the cell still has possibilities
             if state.num_possible[banned_cell] == 0 {
                 state.contradiction = true;
                 continue;

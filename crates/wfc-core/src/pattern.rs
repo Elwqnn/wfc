@@ -3,13 +3,9 @@ use std::hash::{Hash, Hasher};
 
 use crate::Color;
 
-/// Maximum pattern pixels for inline storage (N=4 → 16 pixels).
 const MAX_INLINE: usize = 16;
 
-/// An NxN pattern extracted from the sample.
-///
-/// Pixels are stored inline for N<=4 (no heap allocation).
-/// Hash/Eq/Ord only consider `pixels[..len]` for performance.
+/// NxN pattern stored inline (no heap for N<=4).
 #[derive(Clone, Debug)]
 pub struct Pattern {
     size: usize,
@@ -60,7 +56,6 @@ impl Pattern {
         }
     }
 
-    /// Construct from a fixed buffer (avoids intermediate Vec).
     pub(crate) fn from_buf(size: usize, pixels: [Color; MAX_INLINE], len: usize) -> Self {
         debug_assert_eq!(len, size * size);
         Self { size, len, pixels }
@@ -76,7 +71,7 @@ impl Pattern {
         self.pixels[y * self.size + x]
     }
 
-    /// Rotate pattern 90 degrees clockwise.
+    /// Rotate 90 degrees clockwise.
     pub fn rotate(&self) -> Self {
         let n = self.size;
         let mut buf = [[0u8; 3]; MAX_INLINE];
@@ -88,7 +83,7 @@ impl Pattern {
         Self::from_buf(n, buf, self.len)
     }
 
-    /// Reflect pattern horizontally.
+    /// Reflect horizontally.
     pub fn reflect(&self) -> Self {
         let n = self.size;
         let mut buf = [[0u8; 3]; MAX_INLINE];
@@ -100,7 +95,7 @@ impl Pattern {
         Self::from_buf(n, buf, self.len)
     }
 
-    /// Generate all unique symmetry variants (up to 8), in deterministic sorted order.
+    /// All unique symmetry variants (up to 8), sorted.
     pub fn symmetries(&self) -> Vec<Self> {
         let mut variants = Vec::with_capacity(8);
         let mut current = self.clone();

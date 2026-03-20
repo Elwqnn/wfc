@@ -4,19 +4,16 @@ use rand::rngs::SmallRng;
 use crate::bitset::Bitset;
 use crate::rules::Rules;
 
-/// Mutable state of the WFC solver.
 pub struct State {
     pub(crate) wave: Bitset,
-    /// Compatibility counters: `compat[(cell * num_patterns + pattern) * 4 + dir]`
+    /// `compat[(cell * num_patterns + pattern) * 4 + dir]`
     pub(crate) compat: Vec<u16>,
     pub(crate) num_patterns: usize,
-    /// Number of possible patterns remaining per cell.
     pub(crate) num_possible: Vec<usize>,
-    /// Sum of weights of remaining patterns per cell.
     pub(crate) weight_sum: Vec<f64>,
-    /// Sum of w*ln(w) for remaining patterns per cell (entropy helper).
+    /// Sum of w*ln(w) per cell, for entropy calculation.
     pub(crate) wlog_sum: Vec<f64>,
-    /// Propagation stack: (cell, banned_pattern).
+    /// (cell, banned_pattern) pairs pending propagation.
     pub(crate) stack: Vec<(usize, usize)>,
     pub(crate) contradiction: bool,
     pub(crate) done: bool,
@@ -37,7 +34,6 @@ impl State {
             None => SmallRng::from_os_rng(),
         };
 
-        // Initialize compatibility counters via block copy from base_compat
         let block = num_patterns * 4;
         let mut compat = vec![0u16; wave_size * block];
         for cell in 0..wave_size {
@@ -67,7 +63,7 @@ impl State {
                 }
             }
         }
-        // Clear stack — these bans don't need propagation since all
+        // Clear stack -- these bans don't need propagation since all
         // non-viable patterns are removed uniformly
         state.stack.clear();
 
