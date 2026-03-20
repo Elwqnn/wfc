@@ -69,13 +69,10 @@ jobs:
           chmod 700 ~/.ssh
           echo "$AUR_SSH_KEY" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
-          cat >> ~/.ssh/config << 'EOF'
-          Host aur.archlinux.org
-            IdentityFile ~/.ssh/aur
-            User aur
-            StrictHostKeyChecking accept-new
-          EOF
-          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts || true
+          ssh-keyscan -t ed25519,rsa aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null
+
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/aur -o StrictHostKeyChecking=accept-new"
+          git config --global --add safe.directory /tmp/aur-repo
 
           git clone ssh://aur@aur.archlinux.org/wfc-cli-git.git /tmp/aur-repo || {
             mkdir -p /tmp/aur-repo && cd /tmp/aur-repo && git init
